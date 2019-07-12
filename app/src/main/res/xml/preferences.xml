@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+	<Preference
+		android:key="xposed"
+		android:layout="@layout/preference_activate_xposed"
+		android:title="Xposed Module Not Active"
+		android:summary="Please activate module and reboot device"
+	/>
+
+	<PreferenceCategory
+		android:title="Unclutter Options - Main Feed">	
+		<CheckBoxPreference
+			android:key="hide_ads"
+			android:title="'Sponsored' Content"
+			android:summary="Hide advertisements in posts and stories"
+		/>
+		<CheckBoxPreference
+			android:key="hide_paidpartnerships"
+			android:title="'Paid Partnership With...' Content"
+			android:summary="Hide branded posts from followed accounts"
+		/>
+	</PreferenceCategory>
+
+	<PreferenceCategory
+		android:title="Explore Page">
+		<CheckBoxPreference
+			android:key="hide_explore"
+			android:title="'Explore' Content"
+			android:summary="Hide suggested posts in the search / explore page"
+		/>
+	</PreferenceCategory>
+
+</PreferenceScreen>
