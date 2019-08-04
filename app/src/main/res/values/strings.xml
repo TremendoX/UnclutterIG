@@ -3,6 +3,6 @@
 
     <string name="app_name">Unclutter IG</string>
 
-	<string name="xposed_description">Hide sponsored content from your Instagram feed</string>
+	<string name="xposed_description">Hide ads &amp; sponsored content from your Instagram feed</string>
 
 </resources>

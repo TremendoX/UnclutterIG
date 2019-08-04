@@ -7,7 +7,6 @@ import android.view.*;
 import android.widget.*;
 import com.tremendo.unclutterig.util.*;
 import java.lang.reflect.*;
-import java.util.*;
 import org.json.*;
 
 import de.robv.android.xposed.*;
@@ -19,6 +18,8 @@ public class ExplorePageHooks extends UnclutterIG {
 
 	protected static final String UNCLUTTERED_INDICATOR_TAG = "uncluttered_indicator";
 
+	private static final String SEARCH_ICON_TAG = "search_icon";
+	
 	private static String exploreTopicAdapterClassName;
 
 	private static String exploreFeedAdapterClassName;
@@ -67,17 +68,13 @@ public class ExplorePageHooks extends UnclutterIG {
 						return;
 					}
 
-					try {
-						if (isExploreTopicAdapter(adapter.getClass())) {
-							if (shouldHideExploreFeed()) {
-								param.setResult(null);
-							}
-							
-							findAndStoreExploreLoaderClassName(adapter.getClass());
+					if (isExploreTopicHeader(param.thisObject, adapter.getClass())) {
+
+						if (shouldHideExploreFeed()) {
+							param.setResult(null);
 						}
-					} catch (ReflectiveOperationException e) {
-						XposedBridge.log("Unclutter IG: Stopping unsuccessful attempts at hiding 'Explore' page topics header.  Feature not available.");
-						XposedBridge.unhookMethod(param.method, this);
+
+						findAndStoreExploreLoaderClassName(adapter.getClass());
 					}
 				}
 			});
@@ -117,21 +114,16 @@ public class ExplorePageHooks extends UnclutterIG {
 					return;
 				}
 
-				try {
-					if (isExploreFeedAdapter(adapter.getClass())) {
+				if (isOnExplorePage(param.thisObject, adapter.getClass())) {
 
-						if (shouldHideExploreFeed()) {
-							param.setResult(null);
-						}
-
-						View viewGroup = (ViewGroup) param.thisObject;
-						ViewGroup parentView = (ViewGroup) viewGroup.getParent();
-
-						setUnclutteredStatusIndicator(parentView);
+					if (shouldHideExploreFeed()) {
+						param.setResult(null);
 					}
-				} catch (ReflectiveOperationException e) {
-					XposedBridge.log("Unclutter IG: Stopping unsuccessful attempts at hiding 'Explore' page feed.  Feature not available.");
-					XposedBridge.unhookMethod(param.method, this);
+
+					View viewGroup = (ViewGroup) param.thisObject;
+					ViewGroup parentView = (ViewGroup) viewGroup.getParent();
+
+					setUnclutteredStatusIndicator(parentView);
 				}
 			}
 		});
@@ -139,99 +131,143 @@ public class ExplorePageHooks extends UnclutterIG {
 
 
 
-	/*   
-	 *   Identifies the RecyclerView adapter that populates the 'Explore' page header with topics / categories.
-	 *   
-	 *   Can be distinguished from other RecyclerView adapters:
-	 *      - Newer Instagram versions - Has method that returns 'ExploreTopicCluster' type
-	 *      - Older Instagram versions - Has both Map field and 'user' class field (will need to determine correct class)
-	 */
-	private static boolean isExploreTopicAdapter(Class<?> AdapterObjectClass) throws ReflectiveOperationException {
+	private static boolean isExploreTopicHeader(Object adapterContainer, Class<?> adapterClass) {
 
-		ClassToScan UnknownAdapterClass = new ClassToScan(AdapterObjectClass);
+		if (getExploreTopicAdapterClassName() != null) {
+			return getExploreTopicAdapterClassName().equals(adapterClass.getName());
+		}
 
-		if (UnknownAdapterClass.getName().equals(getExploreTopicAdapterClassName())) {
+		View adapterHolderView = (View) adapterContainer;
+		if (getTopicHeaderResourceId() == adapterHolderView.getId() && matchesExploreHeaderPadding(adapterHolderView.getPaddingBottom())) {
+			exploreTopicAdapterClassName = adapterClass.getName();
 			return true;
 		}
 
-		boolean isExploreTopicAdapter = false;
-
-		if (getExploreTopicAdapterClassName() == null) {
-
-			boolean canSearchForTopicAdapter = true;
-			ClassLoader classLoader = UnknownAdapterClass.getClassLoader();
-
-			if (isAppStructureRevised()) {
-				try {
-					Class<?> ExploreTopicClusterClass = findClass("com.instagram.explore.topiccluster.ExploreTopicCluster", classLoader);
-					isExploreTopicAdapter = UnknownAdapterClass.hasMethodType(ExploreTopicClusterClass);
-				} catch (XposedHelpers.ClassNotFoundError e) {
-					canSearchForTopicAdapter = false;
-					errorLog("Couldn't find 'ExploreTopicCluster' class. Not able to look for method of this type within potential 'Explore' topic adapter");
-				}
-			}
-			else {
-				try {
-					String userClassName = UserUtils.findUserClassName(classLoader);
-					Class<?> UserClass = findClass(userClassName, classLoader);
-					isExploreTopicAdapter = UnknownAdapterClass.hasFieldType(UserClass) && UnknownAdapterClass.hasFieldType(Map.class);
-				} catch (ClassNotFoundException e) {
-					canSearchForTopicAdapter = false;
-					errorLog("Couldn't determine 'user' class. Not able to search for field of this type within potential 'Explore' topic adapter");
-				}
-			}
-
-			if (isExploreTopicAdapter) {
-				exploreTopicAdapterClassName = UnknownAdapterClass.getName();
-			}
-
-			if (!canSearchForTopicAdapter) {
-				throw new ReflectiveOperationException();
-			}
-		}
-
-		return isExploreTopicAdapter;
+		return false;
 	}
 
 
 
-	/*   
-	 *   Identifies the adapter that populates the 'Explore' feed with recommended posts.
-	 *   Adapter is either from ViewPager (older versions) or ListView (newer versions).
-	 *
-	 *   Can be distinguished from other adapters by having specific fields.
-	 */
-	private static boolean isExploreFeedAdapter(Class<?> AdapterObjectClass) throws ReflectiveOperationException {
-		ClassToScan UnknownAdapterClass = new ClassToScan(AdapterObjectClass);
+	private static boolean matchesExploreHeaderPadding(int padding) {
+		int headerPaddingResourceId = getId(getTopicHeaderPaddingResourceName(), "dimen", INSTAGRAM_PACKAGE_NAME);
+		return padding == (int) getDimensionResource(headerPaddingResourceId);
+	}
 
-		if (UnknownAdapterClass.getName().equals(getExploreFeedAdapterClassName())) {
+
+
+	private static int getTopicHeaderResourceId() {
+		if (isAppStructureRevised()) {
+			return getId("destination_hscroll");
+		}
+		return getId("topic_cluster_hscroll");
+	}
+
+
+
+	private static String getTopicHeaderPaddingResourceName() {
+		if (isAppStructureRevised()) {
+			return "explore_header_vertical_padding";
+		}
+		return "topic_cluster_header_padding";
+	}
+
+
+
+	private static float getDimensionResource(int dimensionId) {
+		final Context context = AndroidAppHelper.currentApplication().getApplicationContext();
+		return context.getResources().getDimension(dimensionId);
+	}
+
+
+
+	private static boolean isOnExplorePage(Object adapterContainer, Class<?> adapterClass) {
+
+		if (getExploreFeedAdapterClassName() != null) {
+			return getExploreFeedAdapterClassName().equals(adapterClass.getName());
+		}
+
+		if (!isAppStructureRevised()) {
+			return isLegacyExploreFeedAdapter(adapterClass);
+		}
+		
+		View rootView = ((View) adapterContainer).getRootView();
+		if (isSearchTabButtonSelected(rootView) && isExplorePagePrimaryFeed(rootView)) {
+			exploreFeedAdapterClassName = adapterClass.getName();
 			return true;
 		}
 
-		boolean isExploreFeedAdapter = false;
+		return false;
+	}
 
-		if (getExploreFeedAdapterClassName() == null) {
 
-			if (isAppStructureRevised()) {
-				try {
-					Class<?> ExploreTopicClusterClass = findClass("com.instagram.explore.topiccluster.ExploreTopicCluster", UnknownAdapterClass.getClassLoader());
-					isExploreFeedAdapter = UnknownAdapterClass.hasFieldType(ExploreTopicClusterClass);
-				} catch (XposedHelpers.ClassNotFoundError e) {
-					errorLog("Couldn't find 'ExploreTopicCluster' class. Not able to look for field of this type within potential 'Explore' feed adapter");
-					throw new ReflectiveOperationException();
-				}
+
+	private static boolean isSearchTabButtonSelected(View rootView) {
+		ViewGroup tabBar = rootView.findViewById(getId("tab_bar"));
+		if (tabBar!= null) {
+			findAndTagSearchIcon(tabBar);
+			View searchTabIcon = tabBar.findViewWithTag(SEARCH_ICON_TAG);
+			return (searchTabIcon != null && hasSelectedState(searchTabIcon));
+		}
+		return false;
+	}
+
+
+
+	/*
+	 *   Tagging 'search' icon in tab bar for convenient way of finding it from rootView
+	 */
+	private static void findAndTagSearchIcon(final ViewGroup viewGroup) {
+		for (int i = 0; i < viewGroup.getChildCount(); i++) {
+			View view = viewGroup.getChildAt(i);
+			if ("SEARCH".equals(String.valueOf(view.getTag()))) {
+				view.findViewById(getId("tab_icon")).setTag(SEARCH_ICON_TAG);
 			}
-			else {
-				isExploreFeedAdapter = UnknownAdapterClass.hasFieldType(AbsListView.OnScrollListener.class);
-			}
-
-			if (isExploreFeedAdapter) {
-				exploreFeedAdapterClassName = UnknownAdapterClass.getName();
+			else if (view instanceof ViewGroup) {
+				findAndTagSearchIcon((ViewGroup) view);
 			}
 		}
-
-		return isExploreFeedAdapter;
 	}
+
+
+
+	private static boolean hasSelectedState(View imageView) {
+		int selectedState = getId("state_selected", "attr", "android");
+		for (int drawableState : imageView.getDrawableState()) {
+			if (drawableState == selectedState) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+
+
+	private static boolean isExplorePagePrimaryFeed(View adapterHolderView) {
+		return hasPeekContainer(adapterHolderView.getRootView());
+	}
+
+
+
+	/*
+	 *   For newer versions... hack-ish way of determining whether explore page is at top-most level
+	 */
+	private static boolean hasPeekContainer(View rootView) {
+		return (rootView.findViewById(getId("peek_container")) != null);
+	}
+
+
+
+	private static boolean isLegacyExploreFeedAdapter(Class<?> AdapterObjectClass) {
+		ClassToScan UnknownAdapterClass = new ClassToScan(AdapterObjectClass);
+
+		if (UnknownAdapterClass.hasFieldType(AbsListView.OnScrollListener.class)) {
+			exploreFeedAdapterClassName = UnknownAdapterClass.getName();
+			return true;
+		}
+
+		return false;
+	}
+
 
 
 	/*
@@ -310,7 +346,13 @@ public class ExplorePageHooks extends UnclutterIG {
 
 
 	protected static int getId(String idName) {
-		return AndroidAppHelper.currentApplication().getApplicationContext().getResources().getIdentifier(idName, "id", INSTAGRAM_PACKAGE_NAME);
+		return getId(idName, "id", INSTAGRAM_PACKAGE_NAME);
+	}
+
+
+
+	private static int getId(String resName, String resType, String pkgName) {
+		return AndroidAppHelper.currentApplication().getApplicationContext().getResources().getIdentifier(resName, resType, pkgName);
 	}
 
 
