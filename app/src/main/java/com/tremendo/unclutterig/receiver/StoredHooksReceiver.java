@@ -26,6 +26,10 @@ public class StoredHooksReceiver extends BroadcastReceiver {
 			storeExploreLoaderClass(receivedIntent);
 		}
 
+		if ("com.tremendo.unclutterig.STORE_SPONSORED_FIELD".equals(intentAction)) {
+			storeSponsoredFieldName(receivedIntent);
+		}
+
 	}
 
 
@@ -34,25 +38,41 @@ public class StoredHooksReceiver extends BroadcastReceiver {
 		String appVersionName = intent.getStringExtra("version");
 		String exploreLoaderClassName = intent.getStringExtra("explore_loader_class");
 
-		if (appVersionName == null || exploreLoaderClassName == null) {
+		storeValue(appVersionName, "explore_loader_class", exploreLoaderClassName);
+	}
+
+
+
+	private void storeSponsoredFieldName(Intent intent) {
+		String appVersionName = intent.getStringExtra("version");
+		String sponsoredFieldName = intent.getStringExtra("sponsored_object_field_name");
+
+		storeValue(appVersionName, "sponsored_object_field_name", sponsoredFieldName);
+	}
+
+	
+	
+	private void storeValue(String appVersion, String valueKey, String value) {
+		
+		if (appVersion == null || valueKey == null || value == null) {
 			return;
 		}
 
-		String storedExploreLoaderClassInfo = storedHookPrefs.getString("explore_loader_class", null);
-		JSONObject storedExploreLoaderClassJSON = JSONUtils.asJSONObject(storedExploreLoaderClassInfo);
+		String storedValuesStringInfo = storedHookPrefs.getString(valueKey, null);
+		JSONObject storedValuesJSON = JSONUtils.asJSONObject(storedValuesStringInfo);
 
-		if (!storedExploreLoaderClassJSON.has(appVersionName)) {
+		if (!storedValuesJSON.has(appVersion)) {
 			try {
-				Log.i("Unclutter IG", String.format("Storing 'Explore' page hooks for version '%s'", appVersionName));
-				storedExploreLoaderClassJSON.put(appVersionName, exploreLoaderClassName);
+				Log.i("Unclutter IG", String.format("Storing '%s' for version '%s'", valueKey, appVersion));
+				storedValuesJSON.put(appVersion, value);
 				storedHookPrefs.edit()
-					.putString("explore_loader_class", storedExploreLoaderClassJSON.toString().replace("\"", "'"))
+					.putString(valueKey, storedValuesJSON.toString().replace("\"", "'"))
 					.apply();
 			} catch (JSONException e) {
 				Log.w("Unclutter IG", "Error putting value in JSONObject:\n" + e);
 			}
 		}
 	}
-
+	
 
 }

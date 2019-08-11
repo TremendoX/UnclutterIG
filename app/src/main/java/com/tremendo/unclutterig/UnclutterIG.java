@@ -2,7 +2,7 @@ package com.tremendo.unclutterig;
 
 import android.content.*;
 import android.content.pm.*;
-import java.lang.reflect.*;
+import com.tremendo.unclutterig.util.*;
 
 import de.robv.android.xposed.*;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
@@ -11,7 +11,7 @@ import static de.robv.android.xposed.XposedHelpers.*;
 
 public class UnclutterIG implements IXposedHookLoadPackage {
 
-	protected static final String MODULE_PACKAGE_NAME = UnclutterIG.class.getPackage().getName();
+	public static final String MODULE_PACKAGE_NAME = UnclutterIG.class.getPackage().getName();
 
 	protected static final String INSTAGRAM_PACKAGE_NAME = "com.instagram.android";
 
@@ -36,13 +36,13 @@ public class UnclutterIG implements IXposedHookLoadPackage {
 		}
 
 
-		reloadModulePreferences();
+		resetVariables();
 
-		MainFeedHooks.doHooks(lpparam);
+		new MainFeedHooks(lpparam).doHooks();
 
-		StoryReelHooks.doHooks(lpparam);
+		new StoryReelHooks(lpparam).doHooks();
 
-		ExplorePageHooks.doHooks(lpparam);
+		new ExplorePageHooks(lpparam).doHooks();
 
 		String mainActivityClassName = findMainActivityClassName();
 
@@ -54,7 +54,7 @@ public class UnclutterIG implements IXposedHookLoadPackage {
 					reloadModulePreferences();
 				}
 			});
-		}	
+		}
 
 	}
 
@@ -76,7 +76,7 @@ public class UnclutterIG implements IXposedHookLoadPackage {
 
 
 
-	protected static String getHookedVersionName() {
+	public static String getHookedVersionName() {
 		if (hookedAppVersion == null) {
 			hookedAppVersion = getPackageInfo().versionName;
 		}
@@ -144,6 +144,14 @@ public class UnclutterIG implements IXposedHookLoadPackage {
 
 	public static void errorLog(CharSequence errorMessage) {
 		XposedBridge.log("Unclutter IG: " + errorMessage + "...  Instagram version '" + getHookedVersionName() + "' not supported");
+	}
+
+
+
+	private void resetVariables() {
+		hookedAppVersion = null;
+		reloadModulePreferences();
+		MediaObjectUtils.resetVariables();
 	}
 
 

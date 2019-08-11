@@ -2,6 +2,8 @@ package com.tremendo.unclutterig;
 
 import android.os.*;
 import android.view.*;
+import static com.tremendo.unclutterig.UnclutterIG.*;
+import com.tremendo.unclutterig.util.ResourceUtils;
 import java.lang.reflect.*;
 
 import de.robv.android.xposed.*;
@@ -9,14 +11,14 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import static de.robv.android.xposed.XposedHelpers.*;
 
 
-public class ExplorePageStoredHooks extends ExplorePageHooks {
+public class ExplorePageStoredHooks {
 
 
 	/*
 	 *   If app version was previously hooked and Explore page 'loader' class name successfully stored, then these hooks will nullify loader methods
 	 *   (instead of finding and hooking into adapters to hide their items upon page load).
 	 */
-	public static void doStoredExploreLoaderHooks(String storedExploreLoaderClassName, final LoadPackageParam lpparam) {
+	protected static void doStoredExploreLoaderHooks(String storedExploreLoaderClassName, final LoadPackageParam lpparam) {
 		try {
 			Class<?> ExploreLoaderClass = findClass(storedExploreLoaderClassName, lpparam.classLoader);
 
@@ -44,16 +46,19 @@ public class ExplorePageStoredHooks extends ExplorePageHooks {
 				public void afterHookedMethod(final MethodHookParam param) throws Throwable {
 					ViewGroup viewGroup = (ViewGroup) param.getResult();
 
-					setUnclutteredStatusIndicator(viewGroup);
+					ExplorePageHooks.setUnclutteredStatusIndicator(viewGroup);
 
-					View[] exploreFeedLoadingIndicators = new View[] {
-						viewGroup.findViewById(getId("listview_progressbar")),	/* Newer versions of 'Explore' page, using ListView  */
-						viewGroup.findViewById(getId("loading_stub")),			/* Prior versions of 'Explore' page, using ViewPager */
-					};
+					if (shouldHideExploreFeed()) {
+						View[] exploreFeedLoadingIndicators = new View[] {
+							viewGroup.findViewById(ResourceUtils.getId("listview_progressbar")),	/* Newer versions of 'Explore' page, using ListView  */
+							viewGroup.findViewById(ResourceUtils.getId("loading_stub")),			/* Prior versions of 'Explore' page, using ViewPager */
+						};
 
-					for (View loadingIndicatorView : exploreFeedLoadingIndicators) {
-						hideView(loadingIndicatorView);
+						for (View loadingIndicatorView : exploreFeedLoadingIndicators) {
+							ExplorePageHooks.hideView(loadingIndicatorView);
+						}
 					}
+
 				}
 			});
 
@@ -80,8 +85,8 @@ public class ExplorePageStoredHooks extends ExplorePageHooks {
 			@Override
 			public void beforeHookedMethod(final MethodHookParam param) throws Throwable {
 				View refreshableListView = (View) param.thisObject;
-				View unclutteredIndicator = refreshableListView.getRootView().findViewWithTag(UNCLUTTERED_INDICATOR_TAG);
-
+				View unclutteredIndicator = refreshableListView.getRootView().findViewWithTag(ExplorePageHooks.UNCLUTTERED_INDICATOR_TAG);
+				
 				if (shouldHideExploreFeed() && unclutteredIndicator != null && unclutteredIndicator.isShown()) {
 					param.setResult(null);
 				}

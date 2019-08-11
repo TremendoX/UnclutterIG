@@ -38,6 +38,7 @@
 			android:exported="true">
             <intent-filter>
                 <action android:name="com.tremendo.unclutterig.STORE_EXPLORE_HOOK" />
+				<action android:name="com.tremendo.unclutterig.STORE_SPONSORED_FIELD" />
             </intent-filter>
         </receiver>
 

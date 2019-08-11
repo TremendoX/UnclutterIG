@@ -5,53 +5,57 @@ import android.content.*;
 import android.graphics.*;
 import android.view.*;
 import android.widget.*;
-import com.tremendo.unclutterig.util.*;
+import static com.tremendo.unclutterig.UnclutterIG.*;
+import com.tremendo.unclutterig.util.ResourceUtils;
 import java.lang.reflect.*;
-import org.json.*;
 
 import de.robv.android.xposed.*;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import static de.robv.android.xposed.XposedHelpers.*;
 
 
-public class ExplorePageHooks extends UnclutterIG {
+public class ExplorePageHooks {
 
 	protected static final String UNCLUTTERED_INDICATOR_TAG = "uncluttered_indicator";
 
 	private static final String SEARCH_ICON_TAG = "search_icon";
-	
-	private static String exploreTopicAdapterClassName;
 
-	private static String exploreFeedAdapterClassName;
+	private String exploreTopicAdapterClassName;
 
-	private static boolean appStructureRevised;
+	private String exploreFeedAdapterClassName;
+
+	private boolean appStructureRevised;
+
+	private LoadPackageParam lpparam;
 
 
-	protected static void doHooks(final LoadPackageParam lpparam) {
-
-		final XSharedPreferences storedHookPrefs = new XSharedPreferences(MODULE_PACKAGE_NAME, MODULE_PACKAGE_NAME+"_stored_hooks");
-		storedHookPrefs.makeWorldReadable();
-
-		JSONObject storedExploreLoaderClassesJSON = JSONUtils.asJSONObject(storedHookPrefs.getString("explore_loader_class", null));
-		final String currentVersionExploreLoaderClassName = JSONUtils.getStringFromJSON(storedExploreLoaderClassesJSON, getHookedVersionName());
-
-		if (currentVersionExploreLoaderClassName != null) {
-			ExplorePageStoredHooks.doStoredExploreLoaderHooks(currentVersionExploreLoaderClassName, lpparam);
-			return;
-		}
-
-		setIsAppStructureRevised(lpparam.classLoader);
-
-		hookExploreTopicAdapter(lpparam.classLoader);
-
-		hookExploreFeedAdapter(lpparam.classLoader);
+	public ExplorePageHooks(final LoadPackageParam lpparam) {
+		this.lpparam = lpparam;
 	}
 
 
 
-	private static void hookExploreTopicAdapter(ClassLoader classLoader) {
+	protected void doHooks() {
+
+		String storedExploreLoaderClassName = ResourceUtils.getCurrentVersionStoredValue("explore_loader_class");
+
+		if (storedExploreLoaderClassName != null) {
+			ExplorePageStoredHooks.doStoredExploreLoaderHooks(storedExploreLoaderClassName, lpparam);
+			return;
+		}
+
+		setIsAppStructureRevised();
+
+		hookExploreTopicAdapter();
+
+		hookExploreFeedAdapter();
+	}
+
+
+
+	private void hookExploreTopicAdapter() {
 		try {
-			ClassToScan RecyclerViewClass = new ClassToScan(findClass("com.instagram.ui.recyclerpager.HorizontalRecyclerPager", classLoader).getSuperclass());
+			ClassToScan RecyclerViewClass = new ClassToScan(findClass("com.instagram.ui.recyclerpager.HorizontalRecyclerPager", lpparam.classLoader).getSuperclass());
 			Method recyclerViewSetAdapterMethod = RecyclerViewClass.findMethodByName("setAdapter");
 
 			if (recyclerViewSetAdapterMethod == null) {
@@ -85,7 +89,7 @@ public class ExplorePageHooks extends UnclutterIG {
 
 
 
-	private static void hookExploreFeedAdapter(ClassLoader classLoader) {
+	private void hookExploreFeedAdapter() {
 		Method setAdapterMethod = null;
 
 		if (isAppStructureRevised()) {
@@ -93,7 +97,7 @@ public class ExplorePageHooks extends UnclutterIG {
 		}
 		else {
 			try {
-				ClassToScan ViewPagerClass = ClassToScan.find("android.support.v4.view.ViewPager", classLoader);
+				ClassToScan ViewPagerClass = ClassToScan.find("android.support.v4.view.ViewPager", lpparam.classLoader);
 				setAdapterMethod = ViewPagerClass.findMethodByName("setAdapter");
 			} catch (XposedHelpers.ClassNotFoundError e) {
 				XposedBridge.log("Unclutter IG: Couldn't find ViewPager class. Not able to scan adapters for 'Explore' page feed");
@@ -131,7 +135,7 @@ public class ExplorePageHooks extends UnclutterIG {
 
 
 
-	private static boolean isExploreTopicHeader(Object adapterContainer, Class<?> adapterClass) {
+	private boolean isExploreTopicHeader(Object adapterContainer, Class<?> adapterClass) {
 
 		if (getExploreTopicAdapterClassName() != null) {
 			return getExploreTopicAdapterClassName().equals(adapterClass.getName());
@@ -148,23 +152,23 @@ public class ExplorePageHooks extends UnclutterIG {
 
 
 
-	private static boolean matchesExploreHeaderPadding(int padding) {
-		int headerPaddingResourceId = getId(getTopicHeaderPaddingResourceName(), "dimen", INSTAGRAM_PACKAGE_NAME);
-		return padding == (int) getDimensionResource(headerPaddingResourceId);
+	private boolean matchesExploreHeaderPadding(int padding) {
+		int headerPaddingResourceId = ResourceUtils.getId(getTopicHeaderPaddingResourceName(), "dimen");
+		return padding == (int) ResourceUtils.getDimension(headerPaddingResourceId);
 	}
 
 
 
-	private static int getTopicHeaderResourceId() {
+	private int getTopicHeaderResourceId() {
 		if (isAppStructureRevised()) {
-			return getId("destination_hscroll");
+			return ResourceUtils.getId("destination_hscroll");
 		}
-		return getId("topic_cluster_hscroll");
+		return ResourceUtils.getId("topic_cluster_hscroll");
 	}
 
 
 
-	private static String getTopicHeaderPaddingResourceName() {
+	private String getTopicHeaderPaddingResourceName() {
 		if (isAppStructureRevised()) {
 			return "explore_header_vertical_padding";
 		}
@@ -173,14 +177,7 @@ public class ExplorePageHooks extends UnclutterIG {
 
 
 
-	private static float getDimensionResource(int dimensionId) {
-		final Context context = AndroidAppHelper.currentApplication().getApplicationContext();
-		return context.getResources().getDimension(dimensionId);
-	}
-
-
-
-	private static boolean isOnExplorePage(Object adapterContainer, Class<?> adapterClass) {
+	private boolean isOnExplorePage(Object adapterContainer, Class<?> adapterClass) {
 
 		if (getExploreFeedAdapterClassName() != null) {
 			return getExploreFeedAdapterClassName().equals(adapterClass.getName());
@@ -202,7 +199,7 @@ public class ExplorePageHooks extends UnclutterIG {
 
 
 	private static boolean isSearchTabButtonSelected(View rootView) {
-		ViewGroup tabBar = rootView.findViewById(getId("tab_bar"));
+		ViewGroup tabBar = rootView.findViewById(ResourceUtils.getId("tab_bar"));
 		if (tabBar!= null) {
 			findAndTagSearchIcon(tabBar);
 			View searchTabIcon = tabBar.findViewWithTag(SEARCH_ICON_TAG);
@@ -220,7 +217,7 @@ public class ExplorePageHooks extends UnclutterIG {
 		for (int i = 0; i < viewGroup.getChildCount(); i++) {
 			View view = viewGroup.getChildAt(i);
 			if ("SEARCH".equals(String.valueOf(view.getTag()))) {
-				view.findViewById(getId("tab_icon")).setTag(SEARCH_ICON_TAG);
+				view.findViewById(ResourceUtils.getId("tab_icon")).setTag(SEARCH_ICON_TAG);
 			}
 			else if (view instanceof ViewGroup) {
 				findAndTagSearchIcon((ViewGroup) view);
@@ -231,7 +228,7 @@ public class ExplorePageHooks extends UnclutterIG {
 
 
 	private static boolean hasSelectedState(View imageView) {
-		int selectedState = getId("state_selected", "attr", "android");
+		int selectedState = ResourceUtils.getId("state_selected", "attr", "android");
 		for (int drawableState : imageView.getDrawableState()) {
 			if (drawableState == selectedState) {
 				return true;
@@ -252,12 +249,12 @@ public class ExplorePageHooks extends UnclutterIG {
 	 *   For newer versions... hack-ish way of determining whether explore page is at top-most level
 	 */
 	private static boolean hasPeekContainer(View rootView) {
-		return (rootView.findViewById(getId("peek_container")) != null);
+		return (rootView.findViewById(ResourceUtils.getId("peek_container")) != null);
 	}
 
 
 
-	private static boolean isLegacyExploreFeedAdapter(Class<?> AdapterObjectClass) {
+	private boolean isLegacyExploreFeedAdapter(Class<?> AdapterObjectClass) {
 		ClassToScan UnknownAdapterClass = new ClassToScan(AdapterObjectClass);
 
 		if (UnknownAdapterClass.hasFieldType(AbsListView.OnScrollListener.class)) {
@@ -274,7 +271,7 @@ public class ExplorePageHooks extends UnclutterIG {
 	 *   When feed adapter is detected, module's receiver handles this intent and stores 'loader' class name in SharedPreferences.
 	 *   Next time app is started, module can directly hook loader class instead of needing to scan for correct adapters.
 	 */
-	private static void findAndStoreExploreLoaderClassName(Class<?> AdapterObjectClass) {
+	private void findAndStoreExploreLoaderClassName(Class<?> AdapterObjectClass) {
 		Constructor constructor = AdapterObjectClass.getDeclaredConstructors()[0];
 		Class ClassToHook = null;
 
@@ -345,25 +342,13 @@ public class ExplorePageHooks extends UnclutterIG {
 
 
 
-	protected static int getId(String idName) {
-		return getId(idName, "id", INSTAGRAM_PACKAGE_NAME);
-	}
-
-
-
-	private static int getId(String resName, String resType, String pkgName) {
-		return AndroidAppHelper.currentApplication().getApplicationContext().getResources().getIdentifier(resName, resType, pkgName);
-	}
-
-
-
-	private static String getExploreFeedAdapterClassName() {
+	private String getExploreFeedAdapterClassName() {
 		return exploreFeedAdapterClassName;
 	}
 
 
 
-	private static String getExploreTopicAdapterClassName() {
+	private String getExploreTopicAdapterClassName() {
 		return exploreTopicAdapterClassName;
 	}
 
@@ -373,9 +358,9 @@ public class ExplorePageHooks extends UnclutterIG {
 	 *   Revised versions of 'Explore' page are instances of ExpandingListView (inherits from ListView).
 	 *   Prior versions used instances of ViewPager, from Android support library
 	 */
-	private static void setIsAppStructureRevised(ClassLoader classLoader) {
+	private void setIsAppStructureRevised() {
 		try {
-			findClass("com.instagram.ui.widget.expanding.ExpandingListView", classLoader);
+			findClass("com.instagram.ui.widget.expanding.ExpandingListView", lpparam.classLoader);
 			appStructureRevised = true;
 		} catch (XposedHelpers.ClassNotFoundError e) {
 			appStructureRevised = false;
@@ -384,7 +369,7 @@ public class ExplorePageHooks extends UnclutterIG {
 
 
 
-	private static boolean isAppStructureRevised() {
+	private boolean isAppStructureRevised() {
 		return appStructureRevised;
 	}
 

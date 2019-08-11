@@ -2,7 +2,8 @@ package com.tremendo.unclutterig;
 
 import android.content.*;
 import android.view.*;
-import com.tremendo.unclutterig.util.*;
+import static com.tremendo.unclutterig.UnclutterIG.*;
+import com.tremendo.unclutterig.util.MediaObjectUtils;
 import java.lang.reflect.*;
 
 import de.robv.android.xposed.*;
@@ -10,11 +11,18 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import static de.robv.android.xposed.XposedHelpers.*;
 
 
-public class MainFeedHooks extends UnclutterIG {
+public class MainFeedHooks {
+
+	private LoadPackageParam lpparam;
 
 
-	public static void doHooks(final LoadPackageParam lpparam) {
+	public MainFeedHooks(final LoadPackageParam lpparam) {
+		this.lpparam = lpparam;
+	}
 
+
+
+	protected void doHooks() {
 		String feedViewClassName = findFeedViewClassName(lpparam.classLoader);
 
 		if (feedViewClassName == null) {
@@ -67,7 +75,7 @@ public class MainFeedHooks extends UnclutterIG {
 	 *   Scans field types in the third parameter of LoadMoreButton's method 'setViewType(LoadMoreButton, ?, *?*)'.
 	 *   The relevant field type will contain a Context field and 'getViewTypeCount' method
 	 */
-	private static String findFeedViewClassName(ClassLoader classLoader) {
+	private String findFeedViewClassName(ClassLoader classLoader) {
 		try {
 			ClassToScan LoadMoreButtonClass = ClassToScan.find("com.instagram.ui.widget.loadmore.LoadMoreButton", classLoader);
 			Method setViewTypeMethod = LoadMoreButtonClass.findMethodByName("setViewType");
@@ -92,7 +100,7 @@ public class MainFeedHooks extends UnclutterIG {
 
 
 
-	private static void showFeedItemView(View view, boolean setVisible) {
+	private void showFeedItemView(View view, boolean setVisible) {
 		ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
 
 		if (layoutParams == null) {

@@ -8,7 +8,7 @@ import de.robv.android.xposed.*;
 import static de.robv.android.xposed.XposedHelpers.*;
 
 
-public class UserUtils {
+public final class UserUtils {
 
 	private static String userClassName;
 
@@ -23,7 +23,7 @@ public class UserUtils {
 	 *   There should be a constructor with the targeted parameter type in PeopleTag: 'public PeopleTag(?)'
 	 *   Conditions: (1) One parameter only (2) Parameter is not 'PeopleTag' or 'Parcel' type
 	 */
-	public static String findUserClassName(ClassLoader classLoader) throws ClassNotFoundException {
+	protected static String findUserClassName(ClassLoader classLoader) throws ClassNotFoundException {
 
 		if (getUserClassName() != null) {
 			return getUserClassName();

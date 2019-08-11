@@ -1,6 +1,7 @@
 package com.tremendo.unclutterig;
 
-import com.tremendo.unclutterig.util.*;
+import static com.tremendo.unclutterig.UnclutterIG.*;
+import com.tremendo.unclutterig.util.MediaObjectUtils;
 import java.lang.reflect.*;
 import java.util.*;
 
@@ -9,12 +10,20 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import static de.robv.android.xposed.XposedHelpers.*;
 
 
-public class StoryReelHooks extends UnclutterIG {
+public class StoryReelHooks {
+
+	private LoadPackageParam lpparam;
 
 
-	public static void doHooks(final LoadPackageParam lpparam) {
+	public StoryReelHooks(final LoadPackageParam lpparam) {
+		this.lpparam = lpparam;
+	}
 
-		final String reelClassName = findReelClassName(lpparam.classLoader);
+
+
+	protected void doHooks() {
+
+		final String reelClassName = findReelClassName();
 
 		if (reelClassName == null) {
 			errorLog("Couldn't determine 'reel' class name to skip sponsored content in stories");
@@ -72,9 +81,9 @@ public class StoryReelHooks extends UnclutterIG {
 	/*
 	 *   Should be a method in ReelViewerFragment with the targeted 'reel' class as second parameter in signature: (ReelViewerFragment, ?, String, Integer)
 	 */
-	protected static String findReelClassName(ClassLoader classLoader) {
+	private String findReelClassName() {
 		try {
-			Class<?> ReelViewerFragmentClass = findClass("com.instagram.reels.fragment.ReelViewerFragment", classLoader);
+			Class<?> ReelViewerFragmentClass = findClass("com.instagram.reels.fragment.ReelViewerFragment", lpparam.classLoader);
 
 			for (Method method : ReelViewerFragmentClass.getDeclaredMethods()) {
 				Class[] parameterTypes = method.getParameterTypes();

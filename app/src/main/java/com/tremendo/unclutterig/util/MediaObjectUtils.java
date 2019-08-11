@@ -1,5 +1,7 @@
 package com.tremendo.unclutterig.util;
 
+import android.app.*;
+import android.content.*;
 import com.tremendo.unclutterig.*;
 import java.lang.reflect.*;
 import java.util.*;
@@ -10,7 +12,6 @@ import static de.robv.android.xposed.XposedHelpers.*;
 
 public final class MediaObjectUtils {
 
-
 	private static List<String> mediaObjectFieldNamesToScan;
 
 	private static String sponsoredContentObjectFieldName;
@@ -19,6 +20,7 @@ public final class MediaObjectUtils {
 
 	private static boolean shouldFindPaidPartnership = true;
 
+	private static boolean alreadyCheckedForStoredSponsoredField;
 
 
 	private MediaObjectUtils() {
@@ -45,14 +47,16 @@ public final class MediaObjectUtils {
 	 *   May be called many times while user is scrolling before getting desired result; reuses list of appropriate field names to be scanned.
 	 */
 	private static String findSponsoredContentObjectFieldName(Object mediaObject) {
+
 		if (getSponsoredContentObjectFieldName() == null) {
 			List<String> fieldNamesToScan = getFieldNamesToScan(mediaObject);
 
 			for (String fieldNameInMediaObject : fieldNamesToScan) {
 				Object unknownObject = getObjectField(mediaObject, fieldNameInMediaObject);
 
-				if (hasSponsoredString(unknownObject)) {
+				if (hasSponsoredString(unknownObject) && !isVenueObject(unknownObject)) {
 					setSponsoredContentObjectFieldName(fieldNameInMediaObject);
+					storeSponsoredFieldName();
 					break;
 				}
 			}
@@ -126,6 +130,7 @@ public final class MediaObjectUtils {
 
 
 	private static String getSponsoredContentObjectFieldName() {
+		checkStoredSponsoredFieldNames();
 		return sponsoredContentObjectFieldName;
 	}
 
@@ -187,11 +192,13 @@ public final class MediaObjectUtils {
 
 	private static boolean hasSponsoredString(Object object) {
 		if (object != null) {
-			Field[] declaredFields = object.getClass().getDeclaredFields();
 
+			String sponsoredLabel = getDefaultSponsoredLabel();
+
+			Field[] declaredFields = object.getClass().getDeclaredFields();
 			for (Field field: declaredFields) {
 				if (field.getType() == String.class) {
-					if ("Sponsored".equals(getObjectField(object, field.getName()))) {
+					if (sponsoredLabel.equals(getObjectField(object, field.getName()))) {
 						return true;
 					}
 				}
@@ -199,6 +206,57 @@ public final class MediaObjectUtils {
 		}
 
 		return false;
+	}
+
+
+
+	private static boolean isVenueObject(Object object) {
+		return object.getClass().getSimpleName().equals("Venue");
+	}
+
+
+
+	private static String getDefaultSponsoredLabel() {
+		String localeLanguage = Locale.getDefault().getLanguage();
+		
+		if (LocaleUtils.hasAlternateValue(localeLanguage)) {
+			return LocaleUtils.getAlternateValue(localeLanguage);
+		}
+
+		return ResourceUtils.getString("default_sponsored_label");
+	}
+
+
+
+	private static void checkStoredSponsoredFieldNames() {
+
+		if (alreadyCheckedForStoredSponsoredField) {
+			return;
+		}
+
+		alreadyCheckedForStoredSponsoredField = true;
+
+		String storedSponsoredFieldName = ResourceUtils.getCurrentVersionStoredValue("sponsored_object_field_name");
+		setSponsoredContentObjectFieldName(storedSponsoredFieldName);
+	}
+
+
+
+	private static void storeSponsoredFieldName() {
+		Intent intent = new Intent("com.tremendo.unclutterig.STORE_SPONSORED_FIELD");
+		intent.putExtra("version", UnclutterIG.getHookedVersionName());
+		intent.putExtra("sponsored_object_field_name", getSponsoredContentObjectFieldName());
+		AndroidAppHelper.currentApplication().sendBroadcast(intent);
+	}
+
+
+
+	public static void resetVariables() {
+		mediaObjectFieldNamesToScan = null;
+		sponsoredContentObjectFieldName = null;
+		paidPartnershipObjectMethodName = null;
+		shouldFindPaidPartnership = true;
+		alreadyCheckedForStoredSponsoredField = false;
 	}
 
 

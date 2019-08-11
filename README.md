@@ -9,4 +9,4 @@ Note: Beyond the standard ads, 'paid partnership' branded content refers to any 
 This module automates the process of intercepting and hiding the unwanted content, and shouldn't rely on specific IG versions to function properly.  
 However, if newer IG versions begin to break functionality, module updates should hopefully follow soon to keep up with the changes.  
 &nbsp;  
-As of 08/03/2019, confirmed to support latest release **104.0.0.21.118**.
+As of 08/11/2019, confirmed to support latest release **105.0.0.18.119**.
